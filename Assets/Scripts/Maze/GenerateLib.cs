@@ -12,8 +12,9 @@ public class GenerateLib : MonoBehaviour
 
     void Awake()
     {
-        // 添加所有生成算法
+        // 添加已实现的生成算法
         algorithms.Add(new GenerateAlgorithm0());
+        // 其他算法留给组员实现并注册，例如：
         // algorithms.Add(new GenerateAlgorithm1()); // 待组员实现
         // algorithms.Add(new GenerateAlgorithm2()); // 待组员实现
     }

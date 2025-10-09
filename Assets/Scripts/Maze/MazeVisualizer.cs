@@ -46,28 +46,4 @@ public class MazeVisualizer : MonoBehaviour
             }
         }
     }
-
-    public void UpdateVisualization()
-    {
-        // 如果迷宫更新，重新可视化（简单实现：销毁所有，重新创建）
-        if (visualObjects != null)
-        {
-            for (int x = 0; x < visualObjects.GetLength(0); x++)
-            {
-                for (int y = 0; y < visualObjects.GetLength(1); y++)
-                {
-                    for (int z = 0; z < visualObjects.GetLength(2); z++)
-                    {
-                        if (visualObjects[x, y, z] != null)
-                        {
-                            Destroy(visualObjects[x, y, z]);
-                        }
-                    }
-                }
-            }
-        }
-        VisualizeMaze();
-    }
-
-    // 可以添加方法来更新特定位置等
 }

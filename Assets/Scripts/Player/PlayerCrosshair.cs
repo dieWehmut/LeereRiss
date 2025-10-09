@@ -7,6 +7,7 @@ public class PlayerCrosshair : MonoBehaviour
     public Sprite normalSprite;
     public Sprite interactSprite;
     public Sprite shootSprite;
+    public Sprite alertSprite;
     [Header("Optional")]
     public Camera targetCamera;
 
