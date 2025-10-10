@@ -8,6 +8,7 @@ public class PlayerInput : MonoBehaviour
 	public bool switchViewPressed;
 	public bool switchModePressed;
 	public bool shootPressed;
+	public bool guideCyclePressed;
 	public Vector2 mouseDelta;
 
 	public void HandleInput()
@@ -16,6 +17,7 @@ public class PlayerInput : MonoBehaviour
 		jumpPressed = Input.GetButtonDown("Jump");
 		switchViewPressed = Input.GetKeyDown(KeyCode.V);
 		switchModePressed = Input.GetKeyDown(KeyCode.C);
+		guideCyclePressed = Input.GetKeyDown(KeyCode.G);
 		mouseDelta = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
 		shootPressed = Input.GetMouseButtonDown(0);
 	}
