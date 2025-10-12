@@ -8,23 +8,27 @@ public interface IGenerateAlgorithm
 
 public class GenerateLib : MonoBehaviour
 {
+    [SerializeField] private int defaultAlgorithmIndex = 0;
     public List<IGenerateAlgorithm> algorithms = new List<IGenerateAlgorithm>();
 
     void Awake()
     {
         // 添加已实现的生成算法
         algorithms.Add(new GenerateAlgorithm0());
-        // 其他算法留给组员实现并注册，例如：
-        // algorithms.Add(new GenerateAlgorithm1()); // 待组员实现
-        // algorithms.Add(new GenerateAlgorithm2()); // 待组员实现
+        algorithms.Add(new GenerateAlgorithm1());
+        algorithms.Add(new GenerateAlgorithm2());
     }
 
     // 可以添加方法来选择或运行特定算法
     public void RunGeneration(int[,,] maze, int width, int height, int depth)
     {
-        foreach (var algo in algorithms)
+        if (defaultAlgorithmIndex >= 0 && defaultAlgorithmIndex < algorithms.Count)
         {
-            algo.Generate(maze, width, height, depth);
+            algorithms[defaultAlgorithmIndex].Generate(maze, width, height, depth);
+        }
+        else
+        {
+            Debug.LogWarning($"Default algorithm index {defaultAlgorithmIndex} is out of range.");
         }
     }
 }

@@ -6,13 +6,15 @@ public class Maze : MonoBehaviour
     public MazeData mazeData;
     public MazeGenerator mazeGenerator;
     public MazeVisualizer mazeVisualizer;
+    public PlayerSpawner playerSpawner;
     public Player player;
 
     void Awake()
     {
         if (mazeData == null) mazeData = GetComponent<MazeData>();
-    if (mazeGenerator == null) mazeGenerator = GetComponent<MazeGenerator>();
+        if (mazeGenerator == null) mazeGenerator = GetComponent<MazeGenerator>();
         if (mazeVisualizer == null) mazeVisualizer = GetComponent<MazeVisualizer>();
+        if (playerSpawner == null) playerSpawner = GetComponent<PlayerSpawner>();
         if (player == null) player = FindObjectOfType<Player>();
 
         // 初始化迷宫生成
@@ -22,7 +24,11 @@ public class Maze : MonoBehaviour
         }
 
         // 将Player放置在随机Void位置
-        if (player != null && mazeGenerator != null)
+        if (player != null && playerSpawner != null)
+        {
+            playerSpawner.Spawn(player);
+        }
+        else if (player != null && mazeGenerator != null)
         {
             player.transform.position = mazeGenerator.GetRandomVoidPosition();
         }
