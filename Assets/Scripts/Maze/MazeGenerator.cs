@@ -4,10 +4,11 @@ using System.Collections.Generic;
 public class MazeGenerator : MonoBehaviour
 {
     public GenerateLib generateLib;
-    public int width = 10;
-    public int height = 10;
-    public int depth = 10;
+    [Min(3)] public int width = 11;
+    [Min(3)] public int depth = 11;
+    [Min(3)] public int height = 3;
     public float cellSize = 5f; // 每个格子的大小
+    public float layerHeight = 3f; // 层间距
 
     private int[,,] maze;
 
@@ -18,6 +19,9 @@ public class MazeGenerator : MonoBehaviour
 
     public void GenerateMaze()
     {
+        width = Mathf.Max(3, width);
+        depth = Mathf.Max(3, depth);
+        height = Mathf.Max(3, height);
         maze = new int[width, height, depth];
         if (generateLib != null)
         {
@@ -30,10 +34,16 @@ public class MazeGenerator : MonoBehaviour
         return maze;
     }
 
-    public Vector3 GetRandomVoidPosition()
+    public bool TryGetRandomVoidCell(out Vector3Int cell)
     {
-        List<Vector3> supportedVoids = new List<Vector3>();
-        List<Vector3> anyVoids = new List<Vector3>();
+        cell = Vector3Int.zero;
+        if (maze == null || maze.Length == 0)
+        {
+            return false;
+        }
+
+        List<Vector3Int> voidCells = new List<Vector3Int>();
+
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -42,32 +52,62 @@ public class MazeGenerator : MonoBehaviour
                 {
                     if (maze[x, y, z] == (int)MazeData.CellType.Void)
                     {
-                        anyVoids.Add(new Vector3(x, y, z));
-                        // 支撑条件：y==0(地面)或下方存在Solid
-                        if (y == 0 || maze[x, y - 1, z] == (int)MazeData.CellType.Solid)
-                        {
-                            supportedVoids.Add(new Vector3(x, y, z));
-                        }
+                        voidCells.Add(new Vector3Int(x, y, z));
                     }
                 }
             }
         }
-        Vector3 chosen;
-        if (supportedVoids.Count > 0)
+
+        if (voidCells.Count == 0)
         {
-            chosen = supportedVoids[Random.Range(0, supportedVoids.Count)];
+            return false;
         }
-        else if (anyVoids.Count > 0)
-        {
-            chosen = anyVoids[Random.Range(0, anyVoids.Count)];
-        }
-        else
-        {
-            chosen = Vector3.zero; // 如果没有Void，返回原点
-        }
-        // 转换为世界坐标（乘 cellSize）并把玩家放在格子中心
-        return (chosen + Vector3.one * 0.5f) * cellSize;
+
+        cell = voidCells[Random.Range(0, voidCells.Count)];
+        return true;
     }
 
-    // 可以添加其他方法，如获取特定位置等
+    public Vector3 GetRandomVoidPosition()
+    {
+        if (TryGetRandomVoidCell(out Vector3Int cell))
+        {
+            Vector3 position = CellToWorldCenter(cell);
+            position.y = cell.y * LayerHeight;
+            return position;
+        }
+
+        return transform.position;
+    }
+
+    public Vector3 CellToWorldCenter(Vector3Int cell)
+    {
+        float x = (cell.x + 0.5f) * cellSize;
+        float y = (cell.y + 0.5f) * LayerHeight;
+        float z = (cell.z + 0.5f) * cellSize;
+        return new Vector3(x, y, z);
+    }
+
+    public bool IsInsideBounds(Vector3Int cell)
+    {
+        if (maze == null || maze.Length == 0)
+        {
+            return false;
+        }
+
+        return cell.x >= 0 && cell.x < width &&
+               cell.y >= 0 && cell.y < height &&
+               cell.z >= 0 && cell.z < depth;
+    }
+
+    public bool IsVoid(Vector3Int cell)
+    {
+        if (!IsInsideBounds(cell))
+        {
+            return false;
+        }
+
+        return maze[cell.x, cell.y, cell.z] == (int)MazeData.CellType.Void;
+    }
+
+    public float LayerHeight => Mathf.Max(layerHeight, 0.0001f);
 }

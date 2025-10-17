@@ -12,6 +12,7 @@ public class Player : MonoBehaviour
 	public PlayerInteract playerInteract;
 	public PlayerShoot playerShoot;
 	public PlayerCrosshair playerCrosshair;
+	public PlayerResource playerResource;
 	private bool isRotatingToAim = false;
 	private Vector3? pendingAimPoint = null;
 	private PlayerMode.Mode? pendingActionMode = null;
@@ -26,16 +27,22 @@ public class Player : MonoBehaviour
 		if (playerInteract == null) playerInteract = GetComponent<PlayerInteract>();
 		if (playerShoot == null) playerShoot = GetComponent<PlayerShoot>();
 		if (playerCrosshair == null) playerCrosshair = GetComponent<PlayerCrosshair>();
+		if (playerResource == null) playerResource = GetComponent<PlayerResource>();
 		// Ensure PlayerCamera knows initial mode so it can choose the correct camera variants without a frame of fallback
 		if (playerCamera != null && playerMode != null)
 		{
 			playerCamera.SetMode(playerMode.currentMode);
+		}
+		if (playerShoot != null && playerResource != null)
+		{
+			playerShoot.playerResource = playerResource;
 		}
 		
 	}
 
 	void Update()
 	{
+		playerResource?.Tick(Time.deltaTime);
 		// 采集输入
 		playerInput?.HandleInput();
 		// 切换模式按键

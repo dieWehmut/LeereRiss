@@ -1,9 +1,8 @@
-using UnityEngine;
-using System.Collections.Generic;
 public class GenerateAlgorithm2 : IGenerateAlgorithm
 {
     public void Generate(int[,,] maze, int width, int height, int depth)
     {
-        // 实现生成算法
+        // 复用基础生成逻辑
+        new GenerateAlgorithm0().Generate(maze, width, height, depth);
     }
 }

@@ -3,18 +3,303 @@ using System.Collections.Generic;
 
 public class GenerateAlgorithm0 : IGenerateAlgorithm
 {
-    private int digCount = 0;
-    private int maxDig; // 动态计算
+    private const int MaxAttempts = 6;
+
+    private static readonly Vector3Int[] FaceDirections =
+    {
+        new Vector3Int(1, 0, 0),
+        new Vector3Int(-1, 0, 0),
+        new Vector3Int(0, 1, 0),
+        new Vector3Int(0, -1, 0),
+        new Vector3Int(0, 0, 1),
+        new Vector3Int(0, 0, -1)
+    };
+
+    private static readonly Vector3Int[] CarveDirections =
+    {
+        new Vector3Int(2, 0, 0),
+        new Vector3Int(-2, 0, 0),
+        new Vector3Int(0, 2, 0),
+        new Vector3Int(0, -2, 0),
+        new Vector3Int(0, 0, 2),
+        new Vector3Int(0, 0, -2)
+    };
+
+    private static readonly Vector3Int[] SideDirections =
+    {
+        new Vector3Int(1, 0, 0),
+        new Vector3Int(-1, 0, 0),
+        new Vector3Int(0, 0, 1),
+        new Vector3Int(0, 0, -1)
+    };
+
+    private readonly List<Vector3Int> carvedBuffer = new List<Vector3Int>();
+    private readonly List<Vector3Int> neighborBuffer = new List<Vector3Int>();
+    private readonly List<Vector3Int> candidateBuffer = new List<Vector3Int>();
+    private readonly Queue<Vector3Int> floodQueue = new Queue<Vector3Int>();
 
     public void Generate(int[,,] maze, int width, int height, int depth)
     {
-        // 动态计算maxDig：内部体积的20%
-        int internalVolume = (width - 2) * (height - 2) * (depth - 2);
-        maxDig = (int)(internalVolume * 0.4f);
-        if (maxDig < 10) maxDig = 10; // 最小值
+        if (maze == null || width <= 0 || height <= 0 || depth <= 0)
+        {
+            return;
+        }
 
-        digCount = 0;
-        // 初始化所有为Solid
+        width = Mathf.Max(3, width);
+        height = Mathf.Max(3, height);
+        depth = Mathf.Max(3, depth);
+
+        for (int attempt = 0; attempt < MaxAttempts; attempt++)
+        {
+            FillWithSolids(maze, width, height, depth);
+
+            if (TryGenerateMaze(maze, width, height, depth))
+            {
+                return;
+            }
+        }
+
+        Debug.LogWarning("Maze generation failed to converge to a connected 3D layout. Falling back to a simple corridor.");
+        FallbackGeneration(maze, width, height, depth);
+    }
+
+    private bool TryGenerateMaze(int[,,] maze, int width, int height, int depth)
+    {
+        bool[,,] visited = new bool[width, height, depth];
+        Stack<Vector3Int> stack = new Stack<Vector3Int>();
+        carvedBuffer.Clear();
+
+        Vector3Int start = PickRandomCarveCell(width, height, depth);
+        MarkVisitedAndCarve(maze, visited, start);
+        carvedBuffer.Add(start);
+        stack.Push(start);
+
+        while (stack.Count > 0)
+        {
+            Vector3Int current = stack.Peek();
+            List<Vector3Int> neighbors = GetUnvisitedCarveNeighbors(current, width, height, depth, visited);
+
+            if (neighbors.Count == 0)
+            {
+                stack.Pop();
+                continue;
+            }
+
+            Vector3Int next = neighbors[Random.Range(0, neighbors.Count)];
+            CarveBetween(maze, current, next);
+            if (MarkVisitedAndCarve(maze, visited, next))
+            {
+                carvedBuffer.Add(next);
+            }
+            stack.Push(next);
+        }
+
+        AddLoops(maze, width, height, depth, carvedBuffer);
+        Vector3Int exitCell = CreateExit(maze, width, height, depth, carvedBuffer);
+
+        return ValidateConnectivity(maze, width, height, depth, exitCell);
+    }
+
+    private Vector3Int PickRandomCarveCell(int width, int height, int depth)
+    {
+        int x = RandomOdd(width);
+        int y = RandomOdd(height);
+        int z = RandomOdd(depth);
+        return new Vector3Int(x, y, z);
+    }
+
+    private int RandomOdd(int size)
+    {
+        int interiorCount = Mathf.Max(1, (size - 1) / 2);
+        int index = Random.Range(0, interiorCount);
+        return 1 + index * 2;
+    }
+
+    private bool MarkVisitedAndCarve(int[,,] maze, bool[,,] visited, Vector3Int cell)
+    {
+        if (visited[cell.x, cell.y, cell.z])
+        {
+            return false;
+        }
+
+        visited[cell.x, cell.y, cell.z] = true;
+        maze[cell.x, cell.y, cell.z] = (int)MazeData.CellType.Void;
+        return true;
+    }
+
+    private void CarveBetween(int[,,] maze, Vector3Int from, Vector3Int to)
+    {
+        Vector3Int mid = new Vector3Int((from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
+        maze[mid.x, mid.y, mid.z] = (int)MazeData.CellType.Void;
+        maze[to.x, to.y, to.z] = (int)MazeData.CellType.Void;
+    }
+
+    private List<Vector3Int> GetUnvisitedCarveNeighbors(Vector3Int current, int width, int height, int depth, bool[,,] visited)
+    {
+        neighborBuffer.Clear();
+        for (int i = 0; i < CarveDirections.Length; i++)
+        {
+            Vector3Int candidate = current + CarveDirections[i];
+            if (!IsValidCarveCell(candidate, width, height, depth))
+            {
+                continue;
+            }
+
+            if (!visited[candidate.x, candidate.y, candidate.z])
+            {
+                neighborBuffer.Add(candidate);
+            }
+        }
+        return neighborBuffer;
+    }
+
+    private bool IsValidCarveCell(Vector3Int cell, int width, int height, int depth)
+    {
+        return cell.x > 0 && cell.x < width - 1 &&
+               cell.y > 0 && cell.y < height - 1 &&
+               cell.z > 0 && cell.z < depth - 1 &&
+               (cell.x & 1) == 1 &&
+               (cell.y & 1) == 1 &&
+               (cell.z & 1) == 1;
+    }
+
+    private void AddLoops(int[,,] maze, int width, int height, int depth, List<Vector3Int> carvedCells)
+    {
+        if (carvedCells == null || carvedCells.Count < 8)
+        {
+            return;
+        }
+
+        int loopCount = Mathf.Clamp(carvedCells.Count / 24, 1, carvedCells.Count / 6);
+
+        for (int i = 0; i < loopCount; i++)
+        {
+            Vector3Int anchor = carvedCells[Random.Range(0, carvedCells.Count)];
+
+            for (int j = 0; j < CarveDirections.Length; j++)
+            {
+                Vector3Int target = anchor + CarveDirections[j];
+                if (!IsValidCarveCell(target, width, height, depth))
+                {
+                    continue;
+                }
+
+                Vector3Int mid = new Vector3Int((anchor.x + target.x) / 2, (anchor.y + target.y) / 2, (anchor.z + target.z) / 2);
+                if (maze[target.x, target.y, target.z] == (int)MazeData.CellType.Solid &&
+                    maze[mid.x, mid.y, mid.z] == (int)MazeData.CellType.Solid)
+                {
+                    maze[mid.x, mid.y, mid.z] = (int)MazeData.CellType.Void;
+                    maze[target.x, target.y, target.z] = (int)MazeData.CellType.Void;
+                    carvedCells.Add(target);
+                    break;
+                }
+            }
+        }
+    }
+
+    private Vector3Int CreateExit(int[,,] maze, int width, int height, int depth, List<Vector3Int> carvedCells)
+    {
+        candidateBuffer.Clear();
+
+        if (carvedCells != null)
+        {
+            for (int i = 0; i < carvedCells.Count; i++)
+            {
+                Vector3Int cell = carvedCells[i];
+                for (int d = 0; d < SideDirections.Length; d++)
+                {
+                    Vector3Int boundary = cell + SideDirections[d];
+                    if (IsSideBoundaryCell(boundary, width, height, depth))
+                    {
+                        candidateBuffer.Add(boundary);
+                    }
+                }
+            }
+        }
+
+        Vector3Int exitCell = candidateBuffer.Count > 0
+            ? candidateBuffer[Random.Range(0, candidateBuffer.Count)]
+            : GetFallbackExit(width, height, depth);
+
+        maze[exitCell.x, exitCell.y, exitCell.z] = (int)MazeData.CellType.Void;
+
+        Vector3Int interior = GetInteriorAdjacent(exitCell, width, height, depth);
+        if (IsInsideBounds(interior, width, height, depth) &&
+            maze[interior.x, interior.y, interior.z] == (int)MazeData.CellType.Solid)
+        {
+            maze[interior.x, interior.y, interior.z] = (int)MazeData.CellType.Void;
+            carvedCells?.Add(interior);
+        }
+
+        return exitCell;
+    }
+
+    private bool ValidateConnectivity(int[,,] maze, int width, int height, int depth, Vector3Int exitCell)
+    {
+        if (!IsInsideBounds(exitCell, width, height, depth) ||
+            maze[exitCell.x, exitCell.y, exitCell.z] != (int)MazeData.CellType.Void)
+        {
+            return false;
+        }
+
+        floodQueue.Clear();
+        bool[,,] visited = new bool[width, height, depth];
+        floodQueue.Enqueue(exitCell);
+        visited[exitCell.x, exitCell.y, exitCell.z] = true;
+
+        int visitedCount = 0;
+        while (floodQueue.Count > 0)
+        {
+            Vector3Int current = floodQueue.Dequeue();
+            visitedCount++;
+
+            for (int i = 0; i < FaceDirections.Length; i++)
+            {
+                Vector3Int neighbor = current + FaceDirections[i];
+                if (!IsInsideBounds(neighbor, width, height, depth))
+                {
+                    continue;
+                }
+
+                if (visited[neighbor.x, neighbor.y, neighbor.z])
+                {
+                    continue;
+                }
+
+                if (maze[neighbor.x, neighbor.y, neighbor.z] == (int)MazeData.CellType.Void)
+                {
+                    visited[neighbor.x, neighbor.y, neighbor.z] = true;
+                    floodQueue.Enqueue(neighbor);
+                }
+            }
+        }
+
+        int totalVoids = CountTotalVoids(maze, width, height, depth);
+        return visitedCount == totalVoids;
+    }
+
+    private int CountTotalVoids(int[,,] maze, int width, int height, int depth)
+    {
+        int total = 0;
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                for (int z = 0; z < depth; z++)
+                {
+                    if (maze[x, y, z] == (int)MazeData.CellType.Void)
+                    {
+                        total++;
+                    }
+                }
+            }
+        }
+
+        return total;
+    }
+
+    private void FillWithSolids(int[,,] maze, int width, int height, int depth)
+    {
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -25,160 +310,78 @@ public class GenerateAlgorithm0 : IGenerateAlgorithm
                 }
             }
         }
-
-        // 底部（y=0）保持Solid
-
-        // 随机选择一个出口位置（表面，y>0）
-        Vector3Int exitPos = GetRandomExitPosition(width, height, depth);
-        maze[exitPos.x, exitPos.y, exitPos.z] = (int)MazeData.CellType.Void;
-
-        // 使用递归回溯生成迷宫路径，从出口开始向内部挖
-        bool[,,] visited = new bool[width, height, depth];
-        DigMaze(maze, exitPos, visited, width, height, depth);
     }
 
-    private Vector3Int GetRandomExitPosition(int width, int height, int depth)
+    private void FallbackGeneration(int[,,] maze, int width, int height, int depth)
     {
-        // 随机选择面：0=x=0, 1=x=width-1, 2=z=0, 3=z=depth-1, 4=y=height-1
-        int face = Random.Range(0, 5);
-        int x, y, z;
-        switch (face)
+        FillWithSolids(maze, width, height, depth);
+        int y = EnsureOddInterior(Mathf.Clamp(height / 2, 1, height - 2), height);
+        int z = EnsureOddInterior(Mathf.Clamp(depth / 2, 1, depth - 2), depth);
+        for (int x = 1; x < width - 1; x++)
         {
-            case 0: // x=0, y随机1到height-2, z随机1到depth-2
-                x = 0;
-                y = Random.Range(1, height - 1);
-                z = Random.Range(1, depth - 1);
-                break;
-            case 1: // x=width-1
-                x = width - 1;
-                y = Random.Range(1, height - 1);
-                z = Random.Range(1, depth - 1);
-                break;
-            case 2: // z=0
-                x = Random.Range(1, width - 1);
-                y = Random.Range(1, height - 1);
-                z = 0;
-                break;
-            case 3: // z=depth-1
-                x = Random.Range(1, width - 1);
-                y = Random.Range(1, height - 1);
-                z = depth - 1;
-                break;
-            case 4: // y=height-1
-                x = Random.Range(1, width - 1);
-                y = height - 1;
-                z = Random.Range(1, depth - 1);
-                break;
-            default:
-                x = 0; y = 1; z = 1;
-                break;
+            maze[x, y, z] = (int)MazeData.CellType.Void;
         }
-        return new Vector3Int(x, y, z);
+
+        maze[width - 1, y, z] = (int)MazeData.CellType.Void;
     }
 
-    private void DigMaze(int[,,] maze, Vector3Int start, bool[,,] visited, int width, int height, int depth)
+    private int EnsureOddInterior(int value, int size)
     {
-        // 使用显式栈的随机深度优先搜索（生成树），但在选定方向上延伸多格形成走廊
-        var stack = new System.Collections.Generic.Stack<Vector3Int>();
-        stack.Push(start);
-
-        // 标记起点
-        visited[start.x, start.y, start.z] = true;
-        maze[start.x, start.y, start.z] = (int)MazeData.CellType.Void;
-        digCount++;
-
-        var rng = new System.Random();
-
-        // corridor 参数：最长走廊长度（基于地图尺寸）
-        int maxCorridor = Mathf.Clamp((width + depth) / 6, 1, 6);
-
-        while (stack.Count > 0 && digCount < maxDig)
+        value = Mathf.Clamp(value, 1, size - 2);
+        if ((value & 1) == 0)
         {
-            var current = stack.Pop();
-
-            // 找到所有未访问的邻居
-            var neighbors = GetNeighbors(current, width, height, depth);
-            var unvisited = new System.Collections.Generic.List<Vector3Int>();
-            foreach (var n in neighbors)
+            value = Mathf.Clamp(value + 1, 1, size - 2);
+            if ((value & 1) == 0)
             {
-                if (!visited[n.x, n.y, n.z]) unvisited.Add(n);
-            }
-
-            if (unvisited.Count == 0)
-            {
-                // dead end, 回溯
-                continue;
-            }
-
-            // 随机打乱未访问邻居
-            for (int i = unvisited.Count - 1; i > 0; i--)
-            {
-                int j = rng.Next(i + 1);
-                var tmp = unvisited[i];
-                unvisited[i] = unvisited[j];
-                unvisited[j] = tmp;
-            }
-
-            // 选择第一个作为方向，并尝试在该方向延伸多格形成走廊
-            var chosen = unvisited[0];
-            Vector3Int dir = new Vector3Int(chosen.x - current.x, chosen.y - current.y, chosen.z - current.z);
-
-            // 计算走廊长度（至少1）
-            int corridorLen = UnityEngine.Random.Range(1, maxCorridor + 1);
-
-            Vector3Int carvePos = current;
-            int carvedSteps = 0;
-            for (int step = 0; step < corridorLen && digCount < maxDig; step++)
-            {
-                Vector3Int candidate = new Vector3Int(carvePos.x + dir.x, carvePos.y + dir.y, carvePos.z + dir.z);
-
-                // 检查边界和是否已访问或是外壳（保持表面和底部）
-                if (candidate.x <= 0 || candidate.x >= width - 1 || candidate.z <= 0 || candidate.z >= depth - 1 || candidate.y <= 0 || candidate.y >= height - 1)
-                {
-                    break; // 到达边界或表面，不继续延伸
-                }
-                if (visited[candidate.x, candidate.y, candidate.z]) break; // 避免穿越已挖通道
-
-                // 挖掘此格
-                visited[candidate.x, candidate.y, candidate.z] = true;
-                maze[candidate.x, candidate.y, candidate.z] = (int)MazeData.CellType.Void;
-                digCount++;
-                carvedSteps++;
-                carvePos = candidate;
-            }
-
-            // 如果至少挖出一步，压入新位置以继续
-            if (carvedSteps > 0)
-            {
-                // 如果当前还有其他未访问邻居，保留回溯点
-                if (unvisited.Count > 1)
-                {
-                    stack.Push(current);
-                }
-                stack.Push(carvePos);
-            }
-            else
-            {
-                // 无法在该方向延伸，尝试下一个未访问邻居（将其放回栈以继续探索）
-                for (int i = 1; i < unvisited.Count; i++)
-                {
-                    stack.Push(unvisited[i]);
-                }
+                value = Mathf.Clamp(value - 1, 1, size - 2);
             }
         }
+        return Mathf.Max(1, Mathf.Min(size - 2, value));
     }
 
-    private List<Vector3Int> GetNeighbors(Vector3Int pos, int width, int height, int depth)
+    private bool IsSideBoundaryCell(Vector3Int cell, int width, int height, int depth)
     {
-        List<Vector3Int> neighbors = new List<Vector3Int>();
-        // 水平和前后方向总是添加
-        if (pos.x > 1) neighbors.Add(new Vector3Int(pos.x - 1, pos.y, pos.z)); // 左
-        if (pos.x < width - 2) neighbors.Add(new Vector3Int(pos.x + 1, pos.y, pos.z)); // 右
-        if (pos.z > 1) neighbors.Add(new Vector3Int(pos.x, pos.y, pos.z - 1)); // 前
-        if (pos.z < depth - 2) neighbors.Add(new Vector3Int(pos.x, pos.y, pos.z + 1)); // 后
-        // 垂直方向随机添加，减少垂直连接
-        if (pos.y > 1 && Random.value < 0.2f) neighbors.Add(new Vector3Int(pos.x, pos.y - 1, pos.z)); // 下
-        if (pos.y < height - 2 && Random.value < 0.2f) neighbors.Add(new Vector3Int(pos.x, pos.y + 1, pos.z)); // 上
-        return neighbors;
+        bool onSide = (cell.x == 0 || cell.x == width - 1 || cell.z == 0 || cell.z == depth - 1);
+        return onSide && cell.y > 0 && cell.y < height - 1;
     }
+
+    private bool IsInsideBounds(Vector3Int cell, int width, int height, int depth)
+    {
+        return cell.x >= 0 && cell.x < width &&
+               cell.y >= 0 && cell.y < height &&
+               cell.z >= 0 && cell.z < depth;
+    }
+
+    private Vector3Int GetFallbackExit(int width, int height, int depth)
+    {
+        int y = EnsureOddInterior(Mathf.Clamp(height / 2, 1, height - 2), height);
+        int z = EnsureOddInterior(Mathf.Clamp(depth / 2, 1, depth - 2), depth);
+        return new Vector3Int(width - 1, y, z);
+    }
+
+    private Vector3Int GetInteriorAdjacent(Vector3Int boundary, int width, int height, int depth)
+    {
+        if (boundary.x == 0)
+        {
+            return new Vector3Int(1, boundary.y, boundary.z);
+        }
+
+        if (boundary.x == width - 1)
+        {
+            return new Vector3Int(width - 2, boundary.y, boundary.z);
+        }
+
+        if (boundary.z == 0)
+        {
+            return new Vector3Int(boundary.x, boundary.y, 1);
+        }
+
+        if (boundary.z == depth - 1)
+        {
+            return new Vector3Int(boundary.x, boundary.y, depth - 2);
+        }
+
+        return boundary;
+    }
+
 }

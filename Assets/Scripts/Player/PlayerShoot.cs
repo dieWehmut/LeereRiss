@@ -7,6 +7,9 @@ public class PlayerShoot : MonoBehaviour
     public GameObject bulletPrefab;  // 子弹 prefab
     public float bulletSpeed = 100f;  // 子弹初速度
 
+    [Header("Resource Settings")]
+    public PlayerResource playerResource;
+
     [Header("Audio")]
     [Tooltip("射击音效 (使用 PlayOneShot 播放)")]
     public AudioClip shootClip;
@@ -15,14 +18,19 @@ public class PlayerShoot : MonoBehaviour
 
     [Header("Optional")]
     public float shootCooldown = 0.1f; // 射击间隔
+    [Tooltip("子弹默认加速度 (local forward)")]
+    public float defaultBulletAcceleration = 50f;
     private float lastShootTime = 0f;
 
     public void OnShoot()
     {
         if (muzzle == null || bulletPrefab == null) return;
 
-        if (Time.time - lastShootTime < shootCooldown) return; // 射击冷却
-        lastShootTime = Time.time;
+    if (Time.time - lastShootTime < shootCooldown) return; // 射击冷却
+
+    if (playerResource != null && !playerResource.TryConsumeMana()) return;
+
+    lastShootTime = Time.time;
 
         // Determine firing direction from crosshair aim point (prefer PlayerCrosshair)
         Vector3 aimPoint;
@@ -49,10 +57,10 @@ public class PlayerShoot : MonoBehaviour
         if (ba == null)
         {
             ba = bullet.AddComponent<BulletAcceleration>();
-            // sensible default: accelerate along local forward (positive z) at small value
-            ba.acceleration = new Vector3(0f, 0f, 0f);
-            ba.useLocalForward = true;
         }
+
+        ba.acceleration = new Vector3(0f, 0f, defaultBulletAcceleration);
+        ba.useLocalForward = true;
 
         
         Destroy(bullet, 10f); 
@@ -83,6 +91,11 @@ public class PlayerShoot : MonoBehaviour
                 audioSource = gameObject.AddComponent<AudioSource>();
                 audioSource.playOnAwake = false;
             }
+        }
+
+        if (playerResource == null)
+        {
+            playerResource = GetComponent<PlayerResource>();
         }
     }
 }
