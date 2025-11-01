@@ -1,8 +1,10 @@
 Library/
 Assets/resources/
 Assets/_Recovery/
+Assets/AlienBiomassMaterials
 Temp/
 Logs/
 UserSettings/
 UniGLTF/
 VRM10/
+Build/
