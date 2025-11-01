@@ -23,13 +23,20 @@ public class MainMenuController : MonoBehaviour
     [Header("Buttons that should remain clickable when panel is open")]
     public Button startButton; // 将 Start Button 拖到这里
     public Button difficultyToggleButton; // 面板触发按钮（用于折叠）
-    public Button exitButton; // Exit 按钮（可选，在 StartBtn 下方）
+    public Button exitButton; // Exit 按钮（可选,在 StartBtn 下方）
+    public Button settingsButton; // 设置按钮
     
     [Header("Info panel (game instructions)")]
     public Button infoButton; // 点击显示说明弹窗
     public GameObject infoPanel; // 弹窗根对象（里面包含 Text 和 Close 按钮）
     public Text infoText; // 用于显示说明的正文 Text
     [TextArea(6, 20)] public string infoContent = "Game Info:\n\nControls:\n- WASD: Move\n- Space: Jump\n- V: Toggle first- / third-person view\n- C: Switch fire mode\n- G: Cycle guide hints\n- Mouse Move: Aim\n- Left Mouse Button: Shoot\n- Right Mouse Button: Pause / open menu\n\nObjective:\n- Reach the maze exit to win\n- Losing all health results in defeat\n\nTips:\n- Use cover and swap views to stay aware of enemies\n- Tweak maze size in the Difficulty panel to change the challenge";
+    
+    [Header("Settings panel (fullscreen & volume controls)")]
+    public GameObject settingsPanel; // 设置面板根对象
+    public Toggle fullscreenToggle; // 全屏切换开关
+    public Slider volumeSlider; // 音量滑条
+    public Button closeSettingsButton; // 关闭设置面板按钮
 
     [Header("Optional: show final applied sizes in the UI")]
     public Text willGenerateText; // e.g. a small label under difficulty panel
@@ -94,6 +101,29 @@ public class MainMenuController : MonoBehaviour
     // 初始隐藏信息面板
     if (infoPanel) infoPanel.SetActive(false);
     if (infoText != null) infoText.text = infoContent;
+    
+        // 初始隐藏设置面板
+        if (settingsPanel) settingsPanel.SetActive(false);
+        
+        // 初始化全屏设置（从 PlayerPrefs 加载）
+        if (fullscreenToggle != null)
+        {
+            bool savedFullscreen = PlayerPrefs.GetInt("Fullscreen", Screen.fullScreen ? 1 : 0) == 1;
+            Screen.fullScreen = savedFullscreen;
+            fullscreenToggle.isOn = savedFullscreen;
+            fullscreenToggle.onValueChanged.AddListener(OnFullscreenToggleChanged);
+        }
+        
+        // 初始化音量设置（从 PlayerPrefs 加载）
+        if (volumeSlider != null)
+        {
+            volumeSlider.minValue = 0f;
+            volumeSlider.maxValue = 1f;
+            float savedVolume = PlayerPrefs.GetFloat("Volume", 1f);
+            AudioListener.volume = savedVolume;
+            volumeSlider.value = savedVolume;
+            volumeSlider.onValueChanged.AddListener(OnVolumeSliderChanged);
+        }
     }
 
     /// <summary>
@@ -150,6 +180,7 @@ public class MainMenuController : MonoBehaviour
             if (exitButton != null) exitButton.gameObject.SetActive(false);
             if (difficultyToggleButton != null) difficultyToggleButton.gameObject.SetActive(false);
             if (infoButton != null) infoButton.gameObject.SetActive(false);
+            if (settingsButton != null) settingsButton.gameObject.SetActive(false);
         }
         else
         {
@@ -160,6 +191,7 @@ public class MainMenuController : MonoBehaviour
             if (exitButton != null) exitButton.gameObject.SetActive(true);
             if (difficultyToggleButton != null) difficultyToggleButton.gameObject.SetActive(true);
             if (infoButton != null) infoButton.gameObject.SetActive(true);
+            if (settingsButton != null) settingsButton.gameObject.SetActive(true);
         }
     }
 
@@ -173,6 +205,7 @@ public class MainMenuController : MonoBehaviour
         if (exitButton != null) exitButton.gameObject.SetActive(true);
         if (difficultyToggleButton != null) difficultyToggleButton.gameObject.SetActive(true);
         if (infoButton != null) infoButton.gameObject.SetActive(true);
+        if (settingsButton != null) settingsButton.gameObject.SetActive(true);
     }
 
     // 应用面板上的设置（按钮绑定）
@@ -200,6 +233,7 @@ public class MainMenuController : MonoBehaviour
         if (exitButton != null) exitButton.gameObject.SetActive(true);
         if (difficultyToggleButton != null) difficultyToggleButton.gameObject.SetActive(true);
         if (infoButton != null) infoButton.gameObject.SetActive(true);
+        if (settingsButton != null) settingsButton.gameObject.SetActive(true);
 
         // 更新 UI 中显示的最终生成尺寸（如果有绑定文本）
         UpdateWillGenerateText();
@@ -344,6 +378,7 @@ public class MainMenuController : MonoBehaviour
         if (exitButton != null) exitButton.gameObject.SetActive(false);
         if (difficultyToggleButton != null) difficultyToggleButton.gameObject.SetActive(false);
         if (infoButton != null) infoButton.gameObject.SetActive(false);
+        if (settingsButton != null) settingsButton.gameObject.SetActive(false);
     }
 
     /// <summary>
@@ -359,6 +394,7 @@ public class MainMenuController : MonoBehaviour
         if (exitButton != null) exitButton.gameObject.SetActive(true);
         if (difficultyToggleButton != null) difficultyToggleButton.gameObject.SetActive(true);
         if (infoButton != null) infoButton.gameObject.SetActive(true);
+        if (settingsButton != null) settingsButton.gameObject.SetActive(true);
     }
 
     /// <summary>
@@ -371,5 +407,57 @@ public class MainMenuController : MonoBehaviour
 #else
         Application.Quit();
 #endif
+    }
+
+    /// <summary>
+    /// 显示设置面板（绑定到 Settings 按钮的 OnClick）
+    /// </summary>
+    public void ShowSettingsPanel()
+    {
+        if (settingsPanel == null) return;
+        settingsPanel.SetActive(true);
+
+        // 隐藏所有主菜单按钮（Start / Difficulty / Exit / Info / Settings）
+        if (startButton != null) startButton.gameObject.SetActive(false);
+        if (exitButton != null) exitButton.gameObject.SetActive(false);
+        if (difficultyToggleButton != null) difficultyToggleButton.gameObject.SetActive(false);
+        if (infoButton != null) infoButton.gameObject.SetActive(false);
+        if (settingsButton != null) settingsButton.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// 关闭设置面板（绑定到设置面板内的 Close 按钮）
+    /// </summary>
+    public void CloseSettingsPanel()
+    {
+        if (settingsPanel == null) return;
+        settingsPanel.SetActive(false);
+
+        // 恢复所有主菜单按钮显示
+        if (startButton != null) startButton.gameObject.SetActive(true);
+        if (exitButton != null) exitButton.gameObject.SetActive(true);
+        if (difficultyToggleButton != null) difficultyToggleButton.gameObject.SetActive(true);
+        if (infoButton != null) infoButton.gameObject.SetActive(true);
+        if (settingsButton != null) settingsButton.gameObject.SetActive(true);
+    }
+
+    /// <summary>
+    /// 全屏开关变化回调
+    /// </summary>
+    public void OnFullscreenToggleChanged(bool isOn)
+    {
+        Screen.fullScreen = isOn;
+        PlayerPrefs.SetInt("Fullscreen", isOn ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>
+    /// 音量滑条变化回调
+    /// </summary>
+    public void OnVolumeSliderChanged(float value)
+    {
+        AudioListener.volume = value;
+        PlayerPrefs.SetFloat("Volume", value);
+        PlayerPrefs.Save();
     }
 }

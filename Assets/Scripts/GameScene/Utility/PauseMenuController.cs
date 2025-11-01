@@ -20,6 +20,11 @@ public class PauseMenuController : MonoBehaviour
     public Button quitButton;
     public PlayerInput playerInput;
 
+    [Header("Settings Controls (optional)")]
+    public Toggle fullscreenToggle; // 全屏切换开关
+    public Slider volumeSlider; // 音量滑条
+    public Text volumeText; // 显示音量百分比的文本（可选）
+
     [Header("Settings")]
     public string mainMenuSceneName = "MainMenu";
     public bool preserveExistingButtonOnClicks = false;
@@ -47,10 +52,18 @@ public class PauseMenuController : MonoBehaviour
         {
             // 不创建直到第一次按下右键——这样场景里不会被打扰
         }
+        
+        // 初始化设置控件
+        InitializeSettingsControls();
     }
 
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.Escape) && Screen.fullScreen)
+        {
+            Screen.fullScreen = false;
+        }
+
         // 右键按下切换暂停/继续
         // 未暂停时：用 PlayerInput（若有）控制打开菜单；
         // 已暂停时：不受 InputBlocker 限制，直接读取右键以便快速继续游戏。
@@ -119,6 +132,32 @@ public class PauseMenuController : MonoBehaviour
         }
 
         WireButtons();
+    }
+
+    private void InitializeSettingsControls()
+    {
+        // 初始化全屏开关
+        if (fullscreenToggle != null)
+        {
+            bool savedFullscreen = PlayerPrefs.GetInt("Fullscreen", Screen.fullScreen ? 1 : 0) == 1;
+            Screen.fullScreen = savedFullscreen;
+            fullscreenToggle.isOn = savedFullscreen;
+            fullscreenToggle.onValueChanged.AddListener(OnFullscreenToggleChanged);
+        }
+        
+        // 初始化音量滑条
+        if (volumeSlider != null)
+        {
+            volumeSlider.minValue = 0f;
+            volumeSlider.maxValue = 1f;
+            float savedVolume = PlayerPrefs.GetFloat("Volume", 1f);
+            AudioListener.volume = savedVolume;
+            volumeSlider.value = savedVolume;
+            volumeSlider.onValueChanged.AddListener(OnVolumeSliderChanged);
+            
+            // 更新音量显示文本
+            UpdateVolumeText(savedVolume);
+        }
     }
 
     private void HidePause()
@@ -387,6 +426,40 @@ public class PauseMenuController : MonoBehaviour
                 else if (continueButton == null && (name.Contains("continue") || name.Contains("resume"))) continueButton = b;
                 else if (quitButton == null && (name.Contains("quit") || name.Contains("exit"))) quitButton = b;
             }
+        }
+    }
+
+    /// <summary>
+    /// 全屏开关变化回调
+    /// </summary>
+    public void OnFullscreenToggleChanged(bool isOn)
+    {
+        Screen.fullScreen = isOn;
+        PlayerPrefs.SetInt("Fullscreen", isOn ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>
+    /// 音量滑条变化回调
+    /// </summary>
+    public void OnVolumeSliderChanged(float value)
+    {
+        AudioListener.volume = value;
+        PlayerPrefs.SetFloat("Volume", value);
+        PlayerPrefs.Save();
+        
+        // 更新音量显示文本
+        UpdateVolumeText(value);
+    }
+
+    /// <summary>
+    /// 更新音量百分比显示文本
+    /// </summary>
+    private void UpdateVolumeText(float value)
+    {
+        if (volumeText != null)
+        {
+            volumeText.text = Mathf.RoundToInt(value * 100f) + "%";
         }
     }
 }
