@@ -35,6 +35,11 @@ public class GameOverController : MonoBehaviour
     private CursorLockMode prevCursorLockMode;
     private bool gameplayCursorApplied;
 
+    // 显示期间临时置顶画布并还原
+    private Canvas cachedCanvas;
+    private bool prevOverrideSorting;
+    private int prevSortingOrder;
+
     void Awake()
     {
         if (playerResource == null)
@@ -127,6 +132,8 @@ public class GameOverController : MonoBehaviour
         TryAutoWireFromHierarchy();
         EnsureRaycastBlocker();
         EnsureGraphicRaycaster();
+        EnsurePanelCanvasGroup(gameOverPanel);
+        SetTopmostCanvas(gameOverPanel, true);
         if (gameOverPanel != null) gameOverPanel.SetActive(true);
         if (titleText != null)
         {
@@ -146,6 +153,7 @@ public class GameOverController : MonoBehaviour
     private void HidePanel()
     {
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
+        SetTopmostCanvas(gameOverPanel, false);
     }
 
     private void EnsureUI()
@@ -368,6 +376,38 @@ public class GameOverController : MonoBehaviour
         if (canvas != null && canvas.GetComponent<GraphicRaycaster>() == null)
         {
             canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
+    }
+
+    private void EnsurePanelCanvasGroup(GameObject panel)
+    {
+        if (panel == null) return;
+        var cg = panel.GetComponent<CanvasGroup>();
+        if (cg == null) cg = panel.AddComponent<CanvasGroup>();
+        cg.blocksRaycasts = true;
+        cg.interactable = true;
+        cg.ignoreParentGroups = false;
+    }
+
+    private void SetTopmostCanvas(GameObject panel, bool enable)
+    {
+        if (panel == null) return;
+        var canvas = panel.GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        if (enable)
+        {
+            cachedCanvas = canvas;
+            prevOverrideSorting = canvas.overrideSorting;
+            prevSortingOrder = canvas.sortingOrder;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 9999;
+        }
+        else if (cachedCanvas != null)
+        {
+            cachedCanvas.overrideSorting = prevOverrideSorting;
+            cachedCanvas.sortingOrder = prevSortingOrder;
+            cachedCanvas = null;
         }
     }
 

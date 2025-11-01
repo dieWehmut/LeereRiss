@@ -42,6 +42,12 @@ public class MainMenuController : MonoBehaviour
 
     private void Start()
     {
+        // 防御式：若从暂停/结算返回主菜单，确保输入阻塞被解除
+        InputBlocker.DisableModalBlock();
+        // 主菜单期望显示并释放鼠标
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
+
         // 初始化输入框为当前设置
         if (widthInput) widthInput.text = MazeSettings.Width.ToString();
         if (heightInput) heightInput.text = MazeSettings.Height.ToString();

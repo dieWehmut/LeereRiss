@@ -25,6 +25,13 @@ public class PauseMenuController : MonoBehaviour
     public bool preserveExistingButtonOnClicks = false;
 
     private bool paused = false;
+    // 防抖：避免同一次右键触发关闭后又立刻触发打开（多脚本/同帧次序导致的回闪）
+    private float nextToggleAllowedTime = 0f; // 使用 unscaledTime（暂停时也走时钟）
+
+    // 保存显示期间对画布的临时修改（置顶与排序）
+    private Canvas cachedCanvas;
+    private bool prevOverrideSorting;
+    private int prevSortingOrder;
 
     void Awake()
     {
@@ -44,14 +51,28 @@ public class PauseMenuController : MonoBehaviour
 
     void Update()
     {
-        // 右键按下切换暂停 —— 使用 PlayerInput 提供的按键状态，如果没有则回退到直接读取 Input
-        bool pauseRequest = false;
-        if (playerInput != null) pauseRequest = playerInput.pausePressed;
-        else pauseRequest = Input.GetMouseButtonDown(1);
-
-        if (pauseRequest)
+        // 右键按下切换暂停/继续
+        // 未暂停时：用 PlayerInput（若有）控制打开菜单；
+        // 已暂停时：不受 InputBlocker 限制，直接读取右键以便快速继续游戏。
+        if (!paused)
         {
-            TogglePause();
+            bool pauseRequest = false;
+            if (playerInput != null) pauseRequest = playerInput.pausePressed;
+            else pauseRequest = Input.GetMouseButtonDown(1);
+            if (pauseRequest && Time.unscaledTime >= nextToggleAllowedTime)
+            {
+                TogglePause();
+                nextToggleAllowedTime = Time.unscaledTime + 0.2f;
+            }
+        }
+        else
+        {
+            // 在菜单界面再次点击右键 = 点击“Continue”
+            if ((Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Escape)) && Time.unscaledTime >= nextToggleAllowedTime)
+            {
+                TogglePause();
+                nextToggleAllowedTime = Time.unscaledTime + 0.2f;
+            }
         }
     }
 
@@ -85,6 +106,11 @@ public class PauseMenuController : MonoBehaviour
         // 自动从层级绑定文本与按钮（如果未绑定）
         TryAutoWireFromHierarchy();
 
+        // 确保 UI 可被点击/悬浮：父 Canvas 要有 GraphicRaycaster，Panel 要允许 Raycast
+        EnsureGraphicRaycasterForPanelCanvas(pausePanel);
+        EnsurePanelCanvasGroup(pausePanel);
+        SetTopmostCanvas(pausePanel, true);
+
         if (pausePanel != null) pausePanel.SetActive(true);
         if (titleText != null) titleText.text = "Paused";
         if (detailText != null)
@@ -105,6 +131,9 @@ public class PauseMenuController : MonoBehaviour
 
         // 解除阻塞
         InputBlocker.DisableModalBlock();
+
+        // 还原画布排序
+        SetTopmostCanvas(pausePanel, false);
     }
 
     private void WireButtons()
@@ -118,6 +147,8 @@ public class PauseMenuController : MonoBehaviour
                 Time.timeScale = 1f;
                 Cursor.visible = false;
                 Cursor.lockState = CursorLockMode.Locked;
+                // 重要：离开暂停时解除模态阻塞，避免重载场景后输入被永久屏蔽
+                InputBlocker.DisableModalBlock();
                 SceneManager.LoadScene(SceneManager.GetActiveScene().name);
             });
             ApplyButtonStyle(restartButton);
@@ -132,6 +163,8 @@ public class PauseMenuController : MonoBehaviour
                 Time.timeScale = 1f;
                 Cursor.visible = true;
                 Cursor.lockState = CursorLockMode.None;
+                // 重要：返回主菜单前解除阻塞，避免在主菜单/新一局输入失效
+                InputBlocker.DisableModalBlock();
                 if (!string.IsNullOrEmpty(mainMenuSceneName)) SceneManager.LoadScene(mainMenuSceneName);
             });
             ApplyButtonStyle(mainMenuButton);
@@ -182,6 +215,53 @@ public class PauseMenuController : MonoBehaviour
         if (FindObjectOfType<EventSystem>() == null)
         {
             var es = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        }
+    }
+
+    // 确保包含 panel 的父 Canvas 有 GraphicRaycaster（否则不会接收 UI 射线）
+    private void EnsureGraphicRaycasterForPanelCanvas(GameObject panel)
+    {
+        if (panel == null) return;
+        var canvas = panel.GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+        if (canvas.GetComponent<GraphicRaycaster>() == null)
+        {
+            canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
+    }
+
+    // 确保 Panel（或其父物体）存在 CanvasGroup 并允许 Raycast & 交互
+    private void EnsurePanelCanvasGroup(GameObject panel)
+    {
+        if (panel == null) return;
+        var cg = panel.GetComponent<CanvasGroup>();
+        if (cg == null) cg = panel.AddComponent<CanvasGroup>();
+        cg.blocksRaycasts = true;
+        cg.interactable = true;
+        cg.ignoreParentGroups = false;
+        panel.SetActive(true);
+    }
+
+    // 将该 Panel 所在画布临时置顶，避免被其他全屏 UI 遮住（导致无法悬浮/点击）
+    private void SetTopmostCanvas(GameObject panel, bool enable)
+    {
+        if (panel == null) return;
+        var canvas = panel.GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        if (enable)
+        {
+            cachedCanvas = canvas;
+            prevOverrideSorting = canvas.overrideSorting;
+            prevSortingOrder = canvas.sortingOrder;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 9999;
+        }
+        else if (cachedCanvas != null)
+        {
+            cachedCanvas.overrideSorting = prevOverrideSorting;
+            cachedCanvas.sortingOrder = prevSortingOrder;
+            cachedCanvas = null;
         }
     }
 
