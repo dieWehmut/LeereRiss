@@ -29,7 +29,7 @@ public class MainMenuController : MonoBehaviour
     public Button infoButton; // 点击显示说明弹窗
     public GameObject infoPanel; // 弹窗根对象（里面包含 Text 和 Close 按钮）
     public Text infoText; // 用于显示说明的正文 Text
-    [TextArea(6, 20)] public string infoContent = "游戏说明：\n\n操作：\n- WASD：移动\n- 空格：跳跃\n- V：切换第一/第三人称视角\n- C：切换射击模式\n- 鼠标移动：瞄准，左键射击\n\n目标：\n- 到达迷宫出口则胜利\n- 血量降为 0 则失败\n\n提示：\n- 注意掩体与视角切换，合理使用射击模式可提高生存率\n- 可以调整难度以改变迷宫尺寸和敌人强度";
+    [TextArea(6, 20)] public string infoContent = "Game Info:\n\nControls:\n- WASD: Move\n- Space: Jump\n- V: Toggle first- / third-person view\n- C: Switch fire mode\n- G: Cycle guide hints\n- Mouse Move: Aim\n- Left Mouse Button: Shoot\n- Right Mouse Button: Pause / open menu\n\nObjective:\n- Reach the maze exit to win\n- Losing all health results in defeat\n\nTips:\n- Use cover and swap views to stay aware of enemies\n- Tweak maze size in the Difficulty panel to change the challenge";
 
     [Header("Optional: show final applied sizes in the UI")]
     public Text willGenerateText; // e.g. a small label under difficulty panel
