@@ -13,7 +13,7 @@
 
 - 仓库（源码）：[GitHub - dieWehmut/LeereRiss](https://github.com/dieWehmut/LeereRiss)
 
-- 在线试玩（若已部署）：[LeereRiss 演示](https://LeereRiss.vercel.app)
+- 在线试玩（若已部署）：[LeereRiss 演示](https://leereriss.netlify.app)
 
 ### Windows 可执行
 

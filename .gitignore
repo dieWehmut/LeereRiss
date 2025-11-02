@@ -8,3 +8,5 @@ UserSettings/
 UniGLTF/
 VRM10/
 Build/
+# Local Netlify folder
+.netlify
