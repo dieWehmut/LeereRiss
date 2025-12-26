@@ -13,7 +13,21 @@
 
 - 仓库（源码）：[GitHub - dieWehmut/LeereRiss](https://github.com/dieWehmut/LeereRiss)
 
-- 在线试玩（若已部署）：[LeereRiss 演示](https://leereriss.netlify.app)
+- 在线试玩：[LeereRiss](https://leereriss.netlify.app)
+- 演示视频: [Bilibili - LeereRiss 游戏演示](https://www.bilibili.com/video/BV1YFyfBYELt)
+
+
+## Scripts 目录概要
+
+- `Assets/Scripts/GameScene/`
+	- `Maze/`：迷宫生成与可视化逻辑，主要脚本示例：`MazeGenerator.cs`、`Maze.cs`、`MazeData.cs`、`MazeVisualizer.cs`、`GenerateLib.cs`、`SpawnLib.cs`。子目录 `Algorithm/` 包含多种生成与生成点分配算法（`GenerateAlgorithm0..n.cs`、`SpawnAlgorithm0..n.cs`）。
+	- `NPC/`：NPC 行为体系，分为 `Attack/`、`Concrete/`（具体类型实现，如 `Chaser.cs`、`Ghost.cs`）、`Cooperation/`（合作算法）、`Core/`（`NPCBase.cs`、`NPCManager.cs`、`NPCAnimation.cs`）、`Movement/`（`MovementLib.cs`、移动算法如 `AstarMovement.cs`）、`Perception/`、`Resource/` 等。
+	- `Player/`：玩家相关（`Player.cs`、`PlayerInput.cs`、`PlayerMovement.cs`、`PlayerShoot.cs`、`PlayerResource.cs` 等）并含 `Guide/` 目录用于路径/指引算法（如 `AutoController.cs`、`GuideLib.cs`）。
+	- `Utility/`：局部游戏内工具脚本（如 `GameOverController.cs`、`HealthBar.cs`、`PauseMenuController.cs` 等）。
+
+- `Assets/Scripts/MainMenu/`：主菜单逻辑与 UI 控制器（`MainMenuController.cs`、`MainMenuStyler.cs`、`MazeSettings.cs`、`ButtonHover.cs`）。
+
+- `Assets/Scripts/Utility/`：跨场景共享工具（例如 `GameOverController.cs`、`InputBlocker.cs` 等），供主流程和场景复用。
 
 ### Windows 可执行
 
@@ -44,3 +58,5 @@
 ---
 
 感谢试用与支持！
+
+
